@@ -1,0 +1,7 @@
+{
+  "name": "Image-to-Sketch AI",
+  "description": "An AI-powered web application that allows users to upload images or capture photos and instantly convert them into various artistic sketch styles using Google's Gemini API.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
