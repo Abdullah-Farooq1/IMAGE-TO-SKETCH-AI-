@@ -9,34 +9,6 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-function dataUrlToBlob(dataUrl: string): { blob: Blob, mimeType: string } {
-    const parts = dataUrl.split(';base64,');
-    const mimeType = parts[0].split(':')[1];
-    const byteString = atob(parts[1]);
-    const arrayBuffer = new ArrayBuffer(byteString.length);
-    const uint8Array = new Uint8Array(arrayBuffer);
-    for (let i = 0; i < byteString.length; i++) {
-        uint8Array[i] = byteString.charCodeAt(i);
-    }
-    const blob = new Blob([arrayBuffer], { type: mimeType });
-    return { blob, mimeType };
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (reader.result) {
-                resolve((reader.result as string).split(',')[1]);
-            } else {
-                reject(new Error("Failed to read blob."));
-            }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
 function constructPrompt(options: SketchOptions): string {
     let prompt = `Convert the provided image into a high-quality "${options.sketchStyle}". `;
     prompt += `The line thickness should be ${options.lineThickness.toLowerCase()}. `;
@@ -72,8 +44,17 @@ export async function generateSketch(
     options: SketchOptions
 ): Promise<{ imageUrl: string | null; error?: string }> {
     try {
-        const { mimeType } = dataUrlToBlob(imageDataUrl);
-        const base64ImageData = imageDataUrl.split(',')[1];
+        const parts = imageDataUrl.split(';base64,');
+        if (parts.length !== 2) {
+            return { imageUrl: null, error: "Invalid image data URL format." };
+        }
+        const mimeTypePart = parts[0].split(':')[1];
+        if (!mimeTypePart) {
+             return { imageUrl: null, error: "Could not determine mime type from data URL." };
+        }
+        const mimeType = mimeTypePart;
+        const base64ImageData = parts[1];
+
 
         const textPart = { text: constructPrompt(options) };
         const imagePart = {
@@ -85,9 +66,7 @@ export async function generateSketch(
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
-            contents: {
-                parts: [imagePart, textPart],
-            },
+            contents: [imagePart, textPart],
             config: {
                 responseModalities: [Modality.IMAGE, Modality.TEXT],
             },
